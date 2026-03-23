@@ -1,7 +1,11 @@
-# Shared defaults for all profiles.
+# Default install settings.
 
 # Use the inventory's ansible_user as the install owner by default.
 target_user: "{{ ansible_user | default('root') }}"
+
+# The default install is intentionally conservative:
+# base packages, CLI tools, and shell helpers are on;
+# heavier or more specialized pieces stay off unless you enable them.
 
 # Package installation toggles.
 install_base_packages: true
@@ -20,7 +24,7 @@ cli_packages:
   - ack
   - ripgrep
 
-# Conda defaults.
+# Conda settings.
 install_anaconda: false
 conda_version: "2023.09-0"
 conda_installer_url: "https://repo.anaconda.com/archive/Anaconda3-{{ conda_version }}-Linux-x86_64.sh"
@@ -40,14 +44,14 @@ install_cuda_python: false
 cuda_python_version: "12.1.*"
 cuda_python_pip_package: "cuda-python=={{ cuda_python_version }}"
 
-# GNOME defaults.
+# GNOME settings.
 configure_gnome_appearance: false
 configure_gnome_favorites: false
 configure_gnome_keybindings: false
 enable_keypad_bindings: false
 install_google_chrome: false
 
-# Shell defaults.
+# Shell settings.
 configure_bashrc_aliases: true
 set_git_default_branch: true
 bashrc_aliases_block: |

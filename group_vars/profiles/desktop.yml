@@ -1,5 +1,0 @@
-configure_gnome_appearance: true
-configure_gnome_favorites: true
-configure_gnome_keybindings: true
-enable_keypad_bindings: false
-install_google_chrome: false

@@ -1,45 +1,116 @@
 # ubuntu_install_general
 
-Ansible playbooks for setting up an Ubuntu machine with a few simple install profiles.
+Ansible playbooks for setting up a remote Ubuntu machine from your local computer over SSH.
 
-This repo is meant to be run from your local computer against one or more remote Ubuntu machines over SSH.
+## Two Machines Are Involved
 
-## What You Get
+- `controller machine`: your local computer, such as your Mac or laptop, where this repo is cloned and where you run the commands
+- `target machine`: the remote Ubuntu machine that will actually be configured
 
-- core Ubuntu packages and CLI tools
-- optional Docker and NVIDIA Container Toolkit setup
-- optional Anaconda-based Python environment
-- optional GNOME appearance and workspace keybinding setup
-- useful `.bashrc` aliases and Git defaults
+You run this repo on the controller machine. Ansible connects from the controller machine to the target machine over the network and performs the install there.
 
-## How This Is Used
+## Prerequisites
 
-There are two machines involved:
+### On The Controller Machine
 
-- `controller machine`: your local computer, for example your Mac or laptop, where this repo is cloned and where you run the Ansible commands
-- `target machine`: the remote Ubuntu machine that will be configured by these playbooks
+You need:
 
-You run everything in this repo on the controller machine. Ansible then connects from the controller machine to the target machine over SSH and applies the setup there.
+- `git`
+- `ssh`
+- `ansible`
+- network access to the target machine
 
-## Before You Start
+For example, you can install Ansible with:
 
-Before using these playbooks, plain SSH access from the controller machine to the target machine should already work.
+```bash
+brew install ansible
+```
 
-In practice, this means a command like this should succeed from your local machine:
+or on Ubuntu:
+
+```bash
+sudo apt-get install -y ansible
+```
+
+Install the required Ansible collection:
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
+### On The Target Machine
+
+The target machine should already have:
+
+- Ubuntu installed
+- a user account you can log in as over SSH
+- `sudo` access for that user
+- `python3`
+- `openssh-server`
+- an IP address or hostname reachable from the controller machine
+
+If you are preparing a fresh Ubuntu machine and `python3` or SSH is missing, log into the target machine directly and run:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3 openssh-server
+```
+
+### SSH Must Already Work
+
+Before using these playbooks, plain SSH from the controller machine to the target machine should already succeed.
+
+From your local machine, this should work:
 
 ```bash
 ssh myuser@192.168.1.10
 ```
 
-If the target uses a non-default SSH port, this should work:
+If the target uses a non-default SSH port:
 
 ```bash
 ssh -p 2222 myuser@192.168.1.10
 ```
 
-If SSH does not work yet, fix that first. This repo assumes the network path, username, SSH key or password, and host reachability are already in place.
+Your `inventory.ini` values should match the same username, host, and port that work with SSH manually.
 
-Install the required Ansible collection:
+## What Gets Installed By Default
+
+The default install enables:
+
+- core Ubuntu packages
+- general CLI tools
+- shell aliases and Git defaults
+
+The repo also contains optional support for:
+
+- Docker
+- NVIDIA Container Toolkit
+- Anaconda
+- GNOME appearance settings
+- GNOME workspace keybindings
+- Google Chrome
+
+Those optional pieces are off by default and can be enabled with Ansible variables.
+
+## What Runs Where
+
+### On The Target Machine
+
+Usually only the initial machine prep, if needed:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3 openssh-server
+```
+
+After that, you normally do not run this repo on the target machine directly.
+
+### On The Controller Machine
+
+Clone the repo, create the inventory, verify SSH, and run Ansible from here.
+
+Install the required collection:
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
@@ -51,93 +122,71 @@ Create your inventory file:
 cp inventory/example.ini inventory.ini
 ```
 
-Then edit `inventory.ini` so it points at your machine. A typical entry looks like this:
+Edit `inventory.ini` so it points at your target machine. Example:
 
 ```ini
 [ubuntu]
 my-machine ansible_host=192.168.1.10 ansible_user=myuser ansible_port=22
 ```
 
-Those inventory values should match the same connection details you would use manually with SSH.
-
-## Quick Start
-
-Choose one of the included profiles and run it:
+Optionally verify Ansible connectivity before running the install:
 
 ```bash
-./run_profile.sh minimal -i inventory.ini -K
+ansible -i inventory.ini ubuntu -m ping
 ```
+
+Run the default install:
 
 ```bash
-./run_profile.sh desktop -i inventory.ini -K
+./run_install.sh -i inventory.ini -K
 ```
+
+`-K` tells Ansible to ask for the target machine's sudo password.
+
+## Optional Features
+
+If you want extra components beyond the default install, enable them with `-e`.
+
+Enable Anaconda:
 
 ```bash
-./run_profile.sh ml -i inventory.ini -K
+./run_install.sh -i inventory.ini -K -e install_anaconda=true
 ```
 
-`-K` asks Ansible for the sudo password on the target machine.
-
-## Profiles
-
-### `minimal`
-
-Installs the general Ubuntu packages, CLI tools, and shell helpers.
-
-### `desktop`
-
-Adds GNOME appearance settings, favorites, and arrow-based workspace switching.
-
-### `ml`
-
-Adds Docker, NVIDIA Container Toolkit, Anaconda, and a ready-made ML Python environment.
-
-## Running Without The Wrapper
-
-If you want direct control over Ansible arguments, run the site playbook yourself:
+Enable Docker:
 
 ```bash
-ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/minimal.yml -K
+./run_install.sh -i inventory.ini -K -e install_docker=true
 ```
 
-You can also combine profiles:
+Enable Docker plus NVIDIA Container Toolkit:
 
 ```bash
-ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/desktop.yml -e @group_vars/profiles/ml.yml -K
+./run_install.sh -i inventory.ini -K -e install_docker=true -e install_nvidia_container_toolkit=true
 ```
 
-## Common Overrides
-
-The shared defaults live in `group_vars/all.yml`. A few useful overrides:
-
-Enable keypad workspace bindings:
+Enable GNOME appearance and workspace arrow bindings:
 
 ```bash
-ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/desktop.yml -e enable_keypad_bindings=true -K
+./run_install.sh -i inventory.ini -K -e configure_gnome_appearance=true -e configure_gnome_favorites=true -e configure_gnome_keybindings=true
 ```
 
-Install Google Chrome with the desktop profile:
+Enable keypad workspace bindings too:
 
 ```bash
-ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/desktop.yml -e install_google_chrome=true -K
+./run_install.sh -i inventory.ini -K -e configure_gnome_appearance=true -e configure_gnome_favorites=true -e configure_gnome_keybindings=true -e enable_keypad_bindings=true
 ```
 
-Auto-activate the ML conda environment on login:
+Enable Google Chrome:
 
 ```bash
-ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/ml.yml -e conda_auto_activate_env=ml -K
+./run_install.sh -i inventory.ini -K -e install_google_chrome=true
 ```
 
-## Files
+## Important Files
 
 - `site.yml`: main playbook entrypoint
-- `run_profile.sh`: convenience wrapper for running named profiles
-- `group_vars/all.yml`: shared defaults
-- `group_vars/profiles/`: profile-specific settings
-- `playbooks/`: the individual setup playbooks
-
-## Notes
-
-- The default Ansible target group is `ubuntu`.
-- You can override the target with `-e host_target=<group-or-host>`.
-- The GNOME tasks depend on the `community.general` collection from `requirements.yml`.
+- `run_install.sh`: convenience wrapper for the default install
+- `group_vars/all.yml`: default install settings and optional feature toggles
+- `inventory/example.ini`: sample inventory file
+- `playbooks/`: individual playbooks used by `site.yml`
