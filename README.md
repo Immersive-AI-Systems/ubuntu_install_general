@@ -13,20 +13,22 @@ You run this repo on the controller machine. Ansible connects from the controlle
 
 ### On The Controller Machine
 
-You need:
+The controller machine is the computer where you are reading this repo and running the commands. In many cases that will be your Mac or laptop.
+
+The controller machine needs:
 
 - `git`
 - `ssh`
 - `ansible`
 - network access to the target machine
 
-For example, you can install Ansible with:
+If your controller machine is a Mac, you can install Ansible with:
 
 ```bash
 brew install ansible
 ```
 
-or on Ubuntu:
+If your controller machine is Ubuntu or another Debian-based Linux machine, you can install Ansible with:
 
 ```bash
 sudo apt-get install -y ansible
@@ -40,7 +42,9 @@ ansible-galaxy collection install -r requirements.yml
 
 ### On The Target Machine
 
-The target machine should already have:
+The target machine is the remote Ubuntu machine that will be configured by Ansible.
+
+Before you run this repo, the target machine should already have:
 
 - Ubuntu installed
 - a user account you can log in as over SSH
@@ -49,7 +53,7 @@ The target machine should already have:
 - `openssh-server`
 - an IP address or hostname reachable from the controller machine
 
-If you are preparing a fresh Ubuntu machine and `python3` or SSH is missing, log into the target machine directly and run:
+If you are preparing a fresh Ubuntu machine and `python3` or SSH is missing, log into the target machine directly, on the target machine itself, and run:
 
 ```bash
 sudo apt-get update
@@ -60,19 +64,21 @@ sudo apt-get install -y python3 openssh-server
 
 Before using these playbooks, plain SSH from the controller machine to the target machine should already succeed.
 
-From your local machine, this should work:
+From the controller machine, this should work:
 
 ```bash
 ssh myuser@192.168.1.10
 ```
 
-If the target uses a non-default SSH port:
+If the target uses a non-default SSH port, this should work:
 
 ```bash
 ssh -p 2222 myuser@192.168.1.10
 ```
 
-Your `inventory.ini` values should match the same username, host, and port that work with SSH manually.
+If those SSH commands do not work yet, fix that first. The Ansible setup in this repo assumes that the controller machine can already reach the target machine over SSH.
+
+Your `inventory.ini` values should match the same username, host, and port that work when you SSH manually.
 
 ## What Gets Installed By Default
 
@@ -97,18 +103,18 @@ Those optional pieces are off by default and can be enabled with Ansible variabl
 
 ### On The Target Machine
 
-Usually only the initial machine prep, if needed:
+Usually, you only do initial machine preparation here, if needed:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y python3 openssh-server
 ```
 
-After that, you normally do not run this repo on the target machine directly.
+After that, you normally do not run this repo on the target machine directly. The actual Ansible run happens from the controller machine.
 
 ### On The Controller Machine
 
-Clone the repo, create the inventory, verify SSH, and run Ansible from here.
+This is where you do the real workflow: clone the repo, create the inventory, verify SSH, and run Ansible.
 
 Install the required collection:
 
@@ -122,14 +128,14 @@ Create your inventory file:
 cp inventory/example.ini inventory.ini
 ```
 
-Edit `inventory.ini` so it points at your target machine. Example:
+Edit `inventory.ini` on the controller machine so it points at your target machine. Example:
 
 ```ini
 [ubuntu]
 my-machine ansible_host=192.168.1.10 ansible_user=myuser ansible_port=22
 ```
 
-Optionally verify Ansible connectivity before running the install:
+If you want, verify Ansible connectivity before running the install:
 
 ```bash
 ansible -i inventory.ini ubuntu -m ping
@@ -141,7 +147,7 @@ Run the default install:
 ./run_install.sh -i inventory.ini -K
 ```
 
-`-K` tells Ansible to ask for the target machine's sudo password.
+`-K` tells Ansible to ask for the sudo password on the target machine.
 
 ## Optional Features
 
