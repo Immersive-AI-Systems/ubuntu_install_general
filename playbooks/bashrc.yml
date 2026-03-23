@@ -1,0 +1,67 @@
+---
+- hosts: "{{ host_target | default('ubuntu') }}"
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  pre_tasks:
+    - name: Ensure target_user is defined
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user | length > 0
+        fail_msg: "target_user is not defined."
+
+    - name: Lookup target_user in passwd
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+        split: ":"
+
+    - name: Derive target_home from passwd
+      ansible.builtin.set_fact:
+        target_home: >-
+          {{
+            (
+              getent_passwd[target_user][-2]
+              if (
+                getent_passwd is defined and
+                (target_user in getent_passwd) and
+                (getent_passwd[target_user] | length > 1)
+              )
+              else ansible_user_dir
+            )
+          }}
+
+  tasks:
+    - name: Add general aliases to .bashrc
+      ansible.builtin.blockinfile:
+        path: "{{ target_home }}/.bashrc"
+        marker: "# {mark} ubuntu_install_general aliases"
+        block: "{{ bashrc_aliases_block }}"
+        create: true
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+      tags: [aliases]
+      become_user: "{{ target_user }}"
+      when: configure_bashrc_aliases | bool
+
+    - name: Check target user's Git default init branch
+      ansible.builtin.command: git config --global --get init.defaultBranch
+      register: git_init_default_branch
+      failed_when: false
+      changed_when: false
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+      when: set_git_default_branch | bool
+
+    - name: Set Git default init branch to main
+      ansible.builtin.command: git config --global init.defaultBranch main
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+      when:
+        - set_git_default_branch | bool
+        - git_init_default_branch.rc != 0 or (git_init_default_branch.stdout | default('') | trim) != 'main'

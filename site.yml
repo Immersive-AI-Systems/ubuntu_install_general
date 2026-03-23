@@ -1,0 +1,5 @@
+---
+- import_playbook: playbooks/software.yml
+- import_playbook: playbooks/anaconda.yml
+- import_playbook: playbooks/gnome.yml
+- import_playbook: playbooks/bashrc.yml

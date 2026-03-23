@@ -1,0 +1,13 @@
+install_base_packages: true
+install_cli_tools: true
+install_warp: false
+install_docker: false
+install_nvidia_container_toolkit: false
+
+install_anaconda: false
+
+configure_gnome_appearance: false
+configure_gnome_favorites: false
+configure_gnome_keybindings: false
+enable_keypad_bindings: false
+install_google_chrome: false

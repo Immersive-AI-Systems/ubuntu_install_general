@@ -1,0 +1,83 @@
+# Shared defaults for all profiles.
+
+# Use the inventory's ansible_user as the install owner by default.
+target_user: "{{ ansible_user | default('root') }}"
+
+# Package installation toggles.
+install_base_packages: true
+install_cli_tools: true
+install_warp: false
+install_docker: false
+install_nvidia_container_toolkit: false
+
+# Package lists.
+apt_extra_packages: []
+cli_packages:
+  - joe
+  - tmux
+  - mc
+  - htop
+  - ack
+  - ripgrep
+
+# Conda defaults.
+install_anaconda: false
+conda_version: "2023.09-0"
+conda_installer_url: "https://repo.anaconda.com/archive/Anaconda3-{{ conda_version }}-Linux-x86_64.sh"
+conda_env_name: "ml"
+conda_env_python: "3.10"
+conda_extra_conda_packages: []
+conda_pip_packages: []
+conda_auto_activate_env: ""
+install_pytorch: false
+pytorch_index_url: "https://download.pytorch.org/whl/cu121"
+pytorch_packages:
+  - "torch==2.1.1"
+  - "torchvision==0.16.1"
+  - "torchaudio==2.1.1"
+numpy_pin: "<2"
+install_cuda_python: false
+cuda_python_version: "12.1.*"
+cuda_python_pip_package: "cuda-python=={{ cuda_python_version }}"
+
+# GNOME defaults.
+configure_gnome_appearance: false
+configure_gnome_favorites: false
+configure_gnome_keybindings: false
+enable_keypad_bindings: false
+install_google_chrome: false
+
+# Shell defaults.
+configure_bashrc_aliases: true
+set_git_default_branch: true
+bashrc_aliases_block: |
+  alias n="watch -n 1 nvidia-smi"
+  alias r="realpath"
+  alias ca='conda activate '
+  alias cl='conda env list'
+  alias tl='tmux list'
+  alias ta='tmux a -t '
+  alias la='ls -la'
+  alias gs='git status'
+  alias gp='git pull'
+  export CUDA_HOME="/usr/local/cuda"
+  export LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}"
+
+  function go() {
+    if [ -z "$1" ]; then
+      echo "Provide a commit message."
+      return 1
+    fi
+    git add -A
+    git commit -m "$*"
+    git push
+  }
+
+  function gi() {
+    git pull
+  }
+
+# Compatibility helpers for Ubuntu package naming.
+libgl_package: "{{ 'libgl1' if ansible_distribution_version is version('24.04', '>=') else 'libgl1-mesa-glx' }}"
+libegl_package: "{{ 'libegl1' if ansible_distribution_version is version('24.04', '>=') else 'libegl1-mesa' }}"
+libasound_package: "{{ 'libasound2t64' if ansible_distribution_version is version('24.04', '>=') else 'libasound2' }}"

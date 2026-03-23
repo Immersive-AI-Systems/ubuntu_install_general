@@ -1,0 +1,203 @@
+---
+- hosts: "{{ host_target | default('ubuntu') }}"
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  pre_tasks:
+    - name: Ensure target_user is defined
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user | length > 0
+        fail_msg: "target_user is not defined."
+
+  tasks:
+    - name: Install psutil dependency for GNOME dconf tasks
+      ansible.builtin.apt:
+        name: python3-psutil
+        state: present
+        update_cache: true
+      when:
+        - configure_gnome_appearance | bool or configure_gnome_favorites | bool or configure_gnome_keybindings | bool
+
+    - name: Install Google Chrome
+      block:
+        - name: Install Google Chrome stable
+          ansible.builtin.apt:
+            deb: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+      rescue:
+        - name: Warn about Chrome install failure and continue
+          ansible.builtin.debug:
+            msg: "Chrome install failed ({{ ansible_failed_result.msg | default('unknown error') }}); continuing."
+      when: install_google_chrome | bool
+
+    - name: Disable GNOME system sounds
+      community.general.dconf:
+        key: "/org/gnome/desktop/sound/{{ item.key }}"
+        value: "{{ item.value }}"
+      loop:
+        - { key: 'event-sounds', value: 'false' }
+        - { key: 'input-feedback-sounds', value: 'false' }
+        - { key: 'allow-volume-above-100-percent', value: 'false' }
+        - { key: 'theme-name', value: "''" }
+      become_user: "{{ target_user }}"
+      when: configure_gnome_appearance | bool
+
+    - name: Enable GNOME dark appearance
+      community.general.dconf:
+        key: "/org/gnome/desktop/interface/{{ item.key }}"
+        value: "{{ item.value }}"
+      loop:
+        - { key: 'color-scheme', value: "'prefer-dark'" }
+        - { key: 'gtk-theme', value: "'Yaru-dark'" }
+      become_user: "{{ target_user }}"
+      when: configure_gnome_appearance | bool
+
+    - name: Set desktop background to solid black
+      community.general.dconf:
+        key: "/org/gnome/desktop/background/{{ item.key }}"
+        value: "{{ item.value }}"
+      loop:
+        - { key: 'picture-uri', value: "''" }
+        - { key: 'picture-uri-dark', value: "''" }
+        - { key: 'picture-options', value: "'none'" }
+        - { key: 'color-shading-type', value: "'solid'" }
+        - { key: 'primary-color', value: "'#000000'" }
+        - { key: 'secondary-color', value: "'#000000'" }
+      become_user: "{{ target_user }}"
+      when: configure_gnome_appearance | bool
+
+    - name: Enable dock auto-hide
+      community.general.dconf:
+        key: "/org/gnome/shell/extensions/dash-to-dock/{{ item.key }}"
+        value: "{{ item.value }}"
+      loop:
+        - { key: 'autohide', value: 'true' }
+        - { key: 'intellihide', value: 'false' }
+        - { key: 'dock-fixed', value: 'false' }
+        - { key: 'require-pressure-to-show', value: 'true' }
+      become_user: "{{ target_user }}"
+      when: configure_gnome_appearance | bool
+
+    - name: Ensure Ubuntu Dock extension is enabled if present
+      ansible.builtin.command:
+        cmd: gnome-extensions enable ubuntu-dock@ubuntu.com
+      become_user: "{{ target_user }}"
+      changed_when: false
+      failed_when: false
+      when: configure_gnome_appearance | bool
+
+    - name: Ensure Dash to Dock extension is enabled if present
+      ansible.builtin.command:
+        cmd: gnome-extensions enable dash-to-dock@micxgx.gmail.com
+      become_user: "{{ target_user }}"
+      changed_when: false
+      failed_when: false
+      when: configure_gnome_appearance | bool
+
+    - name: Detect Firefox desktop ID
+      ansible.builtin.shell: |
+        set -euo pipefail
+        for id in firefox_firefox.desktop firefox.desktop org.mozilla.firefox.desktop; do
+          if [ -e "/usr/share/applications/$id" ] || [ -e "/var/lib/snapd/desktop/applications/$id" ]; then
+            echo "$id"
+            exit 0
+          fi
+        done
+        echo "firefox.desktop"
+      args:
+        executable: /bin/bash
+      register: firefox_desktop_id
+      changed_when: false
+      when: configure_gnome_favorites | bool
+
+    - name: Detect Files desktop ID
+      ansible.builtin.shell: |
+        set -euo pipefail
+        for id in org.gnome.Nautilus.desktop nautilus.desktop; do
+          if [ -e "/usr/share/applications/$id" ] || [ -e "/var/lib/snapd/desktop/applications/$id" ]; then
+            echo "$id"
+            exit 0
+          fi
+        done
+        echo "org.gnome.Nautilus.desktop"
+      args:
+        executable: /bin/bash
+      register: files_desktop_id
+      changed_when: false
+      when: configure_gnome_favorites | bool
+
+    - name: Set GNOME favorite apps to Firefox and Files only
+      community.general.dconf:
+        key: /org/gnome/shell/favorite-apps
+        value: >-
+          ['{{ [firefox_desktop_id.stdout | trim, files_desktop_id.stdout | trim] | join("', '") }}']
+      become_user: "{{ target_user }}"
+      when: configure_gnome_favorites | bool
+
+    - name: Set workspace switch keybindings with arrows
+      community.general.dconf:
+        key: "/org/gnome/desktop/wm/keybindings/{{ item.key }}"
+        value: "{{ item.value }}"
+      loop:
+        - { key: 'switch-to-workspace-up', value: "['<Control><Alt>Up']" }
+        - { key: 'switch-to-workspace-down', value: "['<Control><Alt>Down']" }
+        - { key: 'switch-to-workspace-left', value: "['<Control><Alt>Left']" }
+        - { key: 'switch-to-workspace-right', value: "['<Control><Alt>Right']" }
+      become_user: "{{ target_user }}"
+      when: configure_gnome_keybindings | bool
+
+    - name: Add keypad workspace switch bindings
+      community.general.dconf:
+        key: "/org/gnome/desktop/wm/keybindings/{{ item.key }}"
+        value: "{{ item.value }}"
+      loop:
+        - { key: 'switch-to-workspace-up', value: "['<Control><Alt>Up', 'KP_8']" }
+        - { key: 'switch-to-workspace-down', value: "['<Control><Alt>Down', 'KP_2']" }
+        - { key: 'switch-to-workspace-left', value: "['<Control><Alt>Left', 'KP_4']" }
+        - { key: 'switch-to-workspace-right', value: "['<Control><Alt>Right', 'KP_6']" }
+        - { key: 'move-to-workspace-up', value: "['<Primary>KP_8']" }
+        - { key: 'move-to-workspace-down', value: "['<Primary>KP_2']" }
+        - { key: 'move-to-workspace-left', value: "['<Primary>KP_4']" }
+        - { key: 'move-to-workspace-right', value: "['<Primary>KP_6']" }
+      become_user: "{{ target_user }}"
+      when:
+        - configure_gnome_keybindings | bool
+        - enable_keypad_bindings | bool
+
+    - name: Ensure custom keybinding list includes custom0
+      community.general.dconf:
+        key: /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings
+        value: "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/']"
+      become_user: "{{ target_user }}"
+      when:
+        - configure_gnome_keybindings | bool
+        - enable_keypad_bindings | bool
+
+    - name: Set custom keypad terminal launcher name
+      community.general.dconf:
+        key: /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/name
+        value: "'Launch Terminal'"
+      become_user: "{{ target_user }}"
+      when:
+        - configure_gnome_keybindings | bool
+        - enable_keypad_bindings | bool
+
+    - name: Set custom keypad terminal launcher command
+      community.general.dconf:
+        key: /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/command
+        value: "'gnome-terminal'"
+      become_user: "{{ target_user }}"
+      when:
+        - configure_gnome_keybindings | bool
+        - enable_keypad_bindings | bool
+
+    - name: Set custom keypad terminal launcher binding
+      community.general.dconf:
+        key: /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/binding
+        value: "'KP_5'"
+      become_user: "{{ target_user }}"
+      when:
+        - configure_gnome_keybindings | bool
+        - enable_keypad_bindings | bool

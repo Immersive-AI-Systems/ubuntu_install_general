@@ -1,0 +1,273 @@
+---
+- hosts: "{{ host_target | default('ubuntu') }}"
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  pre_tasks:
+    - name: Ensure target_user is defined
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user | length > 0
+        fail_msg: "target_user is not defined."
+
+    - name: Lookup target_user in passwd
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+        split: ":"
+      when: install_anaconda | bool
+
+    - name: Derive target_home from passwd
+      ansible.builtin.set_fact:
+        target_home: >-
+          {{
+            (
+              getent_passwd[target_user][-2]
+              if (
+                getent_passwd is defined and
+                (target_user in getent_passwd) and
+                (getent_passwd[target_user] | length > 1)
+              )
+              else ansible_user_dir
+            )
+          }}
+      when: install_anaconda | bool
+
+    - name: Derive conda_prefix from target_home
+      ansible.builtin.set_fact:
+        conda_prefix: "{{ target_home }}/anaconda3"
+      when: install_anaconda | bool
+
+    - name: Derive target_shell
+      ansible.builtin.set_fact:
+        target_shell: >-
+          {{
+            (
+              getent_passwd[target_user][-1]
+              if (
+                getent_passwd is defined and
+                (target_user in getent_passwd) and
+                (getent_passwd[target_user] | length > 0)
+              )
+              else (ansible_user_shell | default('/bin/bash'))
+            )
+          }}
+      when: install_anaconda | bool
+
+  tasks:
+    - name: Ensure install parent directory exists
+      ansible.builtin.file:
+        path: "{{ conda_prefix | dirname }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+      when: install_anaconda | bool
+
+    - name: Check for ALSA pulse module
+      ansible.builtin.stat:
+        path: "/usr/lib/x86_64-linux-gnu/alsa-lib/libasound_module_conf_pulse.so"
+      register: alsa_pulse_module
+      when:
+        - install_anaconda | bool
+        - ansible_architecture == 'x86_64'
+
+    - name: Ensure ALSA pulse module symlink exists
+      ansible.builtin.file:
+        src: "/usr/lib/x86_64-linux-gnu/alsa-lib/libasound_module_conf_pulse.so"
+        dest: "/usr/lib/x86_64-linux-gnu/libasound_module_conf_pulse.so"
+        state: link
+        force: false
+      when:
+        - install_anaconda | bool
+        - ansible_architecture == 'x86_64'
+        - alsa_pulse_module is defined
+        - alsa_pulse_module.stat.exists
+
+    - name: Download Anaconda installer
+      ansible.builtin.get_url:
+        url: "{{ conda_installer_url }}"
+        dest: "/tmp/anaconda.sh"
+        mode: "0755"
+        force: false
+      when: install_anaconda | bool
+
+    - name: Install conda
+      ansible.builtin.command:
+        cmd: "/tmp/anaconda.sh -b -p {{ conda_prefix }}"
+        creates: "{{ conda_prefix }}/bin/conda"
+      become_user: "{{ target_user }}"
+      when: install_anaconda | bool
+
+    - name: Create conda environment
+      ansible.builtin.command:
+        cmd: "{{ conda_prefix }}/bin/conda create --name {{ conda_env_name }} python={{ conda_env_python }} -y"
+        creates: "{{ conda_prefix }}/envs/{{ conda_env_name }}"
+      become_user: "{{ target_user }}"
+      when: install_anaconda | bool
+
+    - name: Install conda packages into env
+      ansible.builtin.shell: |
+        set -e
+        source "{{ conda_prefix }}/etc/profile.d/conda.sh"
+        conda activate "{{ conda_env_name }}"
+        conda install -y ${PKGS}
+      args:
+        executable: /bin/bash
+      environment:
+        PKGS: "{{ conda_extra_conda_packages | join(' ') }}"
+      become_user: "{{ target_user }}"
+      when:
+        - install_anaconda | bool
+        - (conda_extra_conda_packages | length) > 0
+
+    - name: Install pip packages into env
+      ansible.builtin.shell: |
+        set -e
+        source "{{ conda_prefix }}/etc/profile.d/conda.sh"
+        conda activate "{{ conda_env_name }}"
+        pip install --upgrade pip
+        pip install "numpy{{ numpy_pin }}"
+        if [ -n "${CUDA_PY}" ]; then
+          pip install "${CUDA_PY}"
+        fi
+        if [ "${INSTALL_TORCH}" = "true" ]; then
+          pip install --index-url "${TORCH_IDX}" ${TORCH_PKGS}
+        fi
+        if [ -n "${EXTRA_PKGS}" ]; then
+          for pkg in ${EXTRA_PKGS}; do
+            pip install "$pkg"
+          done
+        fi
+      args:
+        executable: /bin/bash
+      environment:
+        EXTRA_PKGS: "{{ conda_pip_packages | join(' ') }}"
+        TORCH_IDX: "{{ pytorch_index_url }}"
+        TORCH_PKGS: "{{ pytorch_packages | join(' ') }}"
+        INSTALL_TORCH: "{{ 'true' if install_pytorch | bool else 'false' }}"
+        CUDA_PY: "{{ cuda_python_pip_package if install_cuda_python | bool else '' }}"
+      become_user: "{{ target_user }}"
+      when:
+        - install_anaconda | bool
+        - install_pytorch | bool or install_cuda_python | bool or (conda_pip_packages | length) > 0
+
+    - name: Check if .profile exists
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.profile"
+      register: profile_stat
+      when: install_anaconda | bool
+
+    - name: Check if .bash_profile exists
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.bash_profile"
+      register: bash_profile_stat
+      when: install_anaconda | bool
+
+    - name: Check if .zshrc exists
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.zshrc"
+      register: zshrc_stat
+      when: install_anaconda | bool
+
+    - name: Source conda.sh from .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        regexp: 'conda\.sh'
+        line: 'test -f "{{ conda_prefix }}/etc/profile.d/conda.sh" && . "{{ conda_prefix }}/etc/profile.d/conda.sh"'
+        create: true
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+      when: install_anaconda | bool
+
+    - name: Ensure login shell sources .bashrc via .profile
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.profile"
+        regexp: 'bashrc'
+        line: 'test -f "$HOME/.bashrc" && . "$HOME/.bashrc"'
+        insertafter: EOF
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+        create: false
+      when:
+        - install_anaconda | bool
+        - (target_shell | basename) == 'bash'
+        - profile_stat.stat.exists | default(false)
+
+    - name: Ensure login shell sources .bashrc via .bash_profile
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bash_profile"
+        regexp: 'bashrc'
+        line: 'test -f "$HOME/.bashrc" && . "$HOME/.bashrc"'
+        insertafter: EOF
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+        create: false
+      when:
+        - install_anaconda | bool
+        - (target_shell | basename) == 'bash'
+        - bash_profile_stat.stat.exists | default(false)
+
+    - name: Optionally auto-activate conda env in .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        regexp: '^\s*conda activate .+\s*$'
+        line: 'conda activate {{ conda_auto_activate_env }}'
+        insertafter: EOF
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+      when:
+        - install_anaconda | bool
+        - conda_auto_activate_env | length > 0
+
+    - name: Source conda.sh from .zshrc when using zsh
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.zshrc"
+        regexp: 'conda\.sh'
+        line: 'test -f "{{ conda_prefix }}/etc/profile.d/conda.sh" && . "{{ conda_prefix }}/etc/profile.d/conda.sh"'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+        create: false
+      when:
+        - install_anaconda | bool
+        - (target_shell | basename) == 'zsh'
+        - zshrc_stat.stat.exists | default(false)
+
+    - name: Optionally auto-activate conda env in .zshrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.zshrc"
+        regexp: '^\s*conda activate .+\s*$'
+        line: 'conda activate {{ conda_auto_activate_env }}'
+        insertafter: EOF
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+        create: false
+      when:
+        - install_anaconda | bool
+        - (target_shell | basename) == 'zsh'
+        - zshrc_stat.stat.exists | default(false)
+        - conda_auto_activate_env | length > 0
+
+    - name: Verify conda version
+      ansible.builtin.shell: |
+        set -e
+        source "{{ conda_prefix }}/etc/profile.d/conda.sh"
+        conda --version
+      args:
+        executable: /bin/bash
+      become_user: "{{ target_user }}"
+      register: conda_ver
+      when: install_anaconda | bool
+
+    - name: Show conda version
+      ansible.builtin.debug:
+        var: conda_ver.stdout
+      when: install_anaconda | bool
