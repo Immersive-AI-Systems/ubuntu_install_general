@@ -13,8 +13,6 @@ You run this repo on the controller machine. Ansible connects from the controlle
 
 ### On The Controller Machine
 
-The controller machine is the computer where you are reading this repo and running the commands. In many cases that will be your Mac or laptop.
-
 The controller machine needs:
 
 - `git`
@@ -43,8 +41,6 @@ ansible-galaxy collection install -r requirements.yml
 
 ### On The Target Machine
 
-The target machine is the remote Ubuntu machine that will be configured by Ansible.
-
 Before you run this repo, the target machine should already have:
 
 - Ubuntu installed
@@ -64,11 +60,6 @@ sudo apt-get install -y python3 openssh-server
 ### SSH Access Before Running The Install
 
 Before you run the main install, the controller machine must be able to reach the target machine over SSH.
-
-There are two common situations:
-
-- plain SSH already works, for example with an SSH key you already set up
-- password-based SSH works, and you want this repo to help install your local SSH key and write `inventory.ini`
 
 If plain SSH already works, a command like this should succeed from the controller machine:
 
@@ -122,7 +113,7 @@ After that, you normally do not run this repo on the target machine directly. Th
 
 ### On The Controller Machine
 
-This is where you do the real workflow: clone the repo, create the inventory, verify SSH, and run Ansible.
+This is where you do the real workflow.
 
 Install the required collection:
 
@@ -130,26 +121,13 @@ Install the required collection:
 ansible-galaxy collection install -r requirements.yml
 ```
 
-The easiest way to set up `inventory.ini` is to run:
+Create `inventory.ini` with:
 
 ```bash
 ./init_remote_host.sh
 ```
 
 That helper runs on the controller machine. It asks for the target hostname or IP, SSH username, and port, can optionally install your local SSH key on the target using `ssh-copy-id`, and then writes `inventory.ini` for you.
-
-If you prefer to create the inventory manually instead, you can still do that:
-
-```bash
-cp inventory/example.ini inventory.ini
-```
-
-Edit `inventory.ini` on the controller machine so it points at your target machine. Example:
-
-```ini
-[ubuntu]
-my-machine ansible_host=192.168.1.10 ansible_user=myuser ansible_port=22
-```
 
 If you want, verify Ansible connectivity before running the install:
 
@@ -211,5 +189,5 @@ Enable Google Chrome:
 - `init_remote_host.sh`: helper for writing `inventory.ini` and optionally installing your local SSH key on the target
 - `run_install.sh`: convenience wrapper for the default install
 - `group_vars/all.yml`: default install settings and optional feature toggles
-- `inventory/example.ini`: sample inventory file
+- `inventory/example.ini`: reference inventory format
 - `playbooks/`: individual playbooks used by `site.yml`

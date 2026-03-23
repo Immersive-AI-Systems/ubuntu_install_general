@@ -36,7 +36,7 @@ done
 
 if [[ "$HAS_INVENTORY_ARG" == false && ! -f "$DEFAULT_INVENTORY" ]]; then
   echo "Error: ${DEFAULT_INVENTORY} not found." >&2
-  echo "Copy inventory/example.ini to inventory.ini or pass -i <inventory>." >&2
+  echo "Run ./init_remote_host.sh to create inventory.ini, or pass -i <inventory>." >&2
   exit 1
 fi
 
