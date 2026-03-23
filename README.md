@@ -21,6 +21,7 @@ The controller machine needs:
 - `ssh`
 - `ansible`
 - network access to the target machine
+- `ssh-copy-id` if you want `init_remote_host.sh` to install your local SSH key on the target
 
 If your controller machine is a Mac, you can install Ansible with:
 
@@ -60,11 +61,16 @@ sudo apt-get update
 sudo apt-get install -y python3 openssh-server
 ```
 
-### SSH Must Already Work
+### SSH Access Before Running The Install
 
-Before using these playbooks, plain SSH from the controller machine to the target machine should already succeed.
+Before you run the main install, the controller machine must be able to reach the target machine over SSH.
 
-From the controller machine, this should work:
+There are two common situations:
+
+- plain SSH already works, for example with an SSH key you already set up
+- password-based SSH works, and you want this repo to help install your local SSH key and write `inventory.ini`
+
+If plain SSH already works, a command like this should succeed from the controller machine:
 
 ```bash
 ssh myuser@192.168.1.10
@@ -76,7 +82,9 @@ If the target uses a non-default SSH port, this should work:
 ssh -p 2222 myuser@192.168.1.10
 ```
 
-If those SSH commands do not work yet, fix that first. The Ansible setup in this repo assumes that the controller machine can already reach the target machine over SSH.
+If you can reach the machine over the network and log in with a password but have not set up key-based SSH yet, `./init_remote_host.sh` can help with that by running `ssh-copy-id` for you.
+
+If the controller machine cannot reach the target machine at all yet, fix that first. This repo assumes the network path, hostname or IP, and login credentials are already known.
 
 Your `inventory.ini` values should match the same username, host, and port that work when you SSH manually.
 
@@ -122,7 +130,15 @@ Install the required collection:
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Create your inventory file:
+The easiest way to set up `inventory.ini` is to run:
+
+```bash
+./init_remote_host.sh
+```
+
+That helper runs on the controller machine. It asks for the target hostname or IP, SSH username, and port, can optionally install your local SSH key on the target using `ssh-copy-id`, and then writes `inventory.ini` for you.
+
+If you prefer to create the inventory manually instead, you can still do that:
 
 ```bash
 cp inventory/example.ini inventory.ini
@@ -192,6 +208,7 @@ Enable Google Chrome:
 ## Important Files
 
 - `site.yml`: main playbook entrypoint
+- `init_remote_host.sh`: helper for writing `inventory.ini` and optionally installing your local SSH key on the target
 - `run_install.sh`: convenience wrapper for the default install
 - `group_vars/all.yml`: default install settings and optional feature toggles
 - `inventory/example.ini`: sample inventory file
