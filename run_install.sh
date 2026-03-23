@@ -11,8 +11,8 @@ Usage: ./run_install.sh [ansible-playbook options]
 
 Examples:
   ./run_install.sh -i inventory.ini -K
-  ./run_install.sh -i inventory.ini -K -e install_anaconda=true
-  ./run_install.sh -i inventory.ini -K -e install_docker=true
+  ./run_install.sh -i inventory.ini -K -e install_google_chrome=false
+  ./run_install.sh -i inventory.ini -K -e install_docker=false -e install_nvidia_container_toolkit=false -e install_anaconda=false
 EOF
 }
 

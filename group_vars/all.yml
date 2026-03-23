@@ -3,19 +3,23 @@
 # Use the inventory's ansible_user as the install owner by default.
 target_user: "{{ ansible_user | default('root') }}"
 
-# The default install is intentionally conservative:
-# base packages, CLI tools, and shell helpers are on;
-# heavier or more specialized pieces stay off unless you enable them.
+# The default install enables the full general setup.
+# Keypad bindings remain off by default.
 
 # Package installation toggles.
 install_base_packages: true
 install_cli_tools: true
 install_warp: false
-install_docker: false
-install_nvidia_container_toolkit: false
+install_docker: true
+install_nvidia_container_toolkit: true
 
 # Package lists.
-apt_extra_packages: []
+apt_extra_packages:
+  - libasound2-dev
+  - libasound2-plugins
+  - libportaudio2
+  - ffmpeg
+  - nvidia-settings
 cli_packages:
   - joe
   - tmux
@@ -25,31 +29,37 @@ cli_packages:
   - ripgrep
 
 # Conda settings.
-install_anaconda: false
+install_anaconda: true
 conda_version: "2023.09-0"
 conda_installer_url: "https://repo.anaconda.com/archive/Anaconda3-{{ conda_version }}-Linux-x86_64.sh"
 conda_env_name: "ml"
 conda_env_python: "3.10"
-conda_extra_conda_packages: []
-conda_pip_packages: []
+conda_extra_conda_packages:
+  - spyder
+  - spyder-kernels
+conda_pip_packages:
+  - datasets
+  - diffusers==0.25.0
+  - transformers
+  - accelerate
 conda_auto_activate_env: ""
-install_pytorch: false
+install_pytorch: true
 pytorch_index_url: "https://download.pytorch.org/whl/cu121"
 pytorch_packages:
   - "torch==2.1.1"
   - "torchvision==0.16.1"
   - "torchaudio==2.1.1"
 numpy_pin: "<2"
-install_cuda_python: false
+install_cuda_python: true
 cuda_python_version: "12.1.*"
 cuda_python_pip_package: "cuda-python=={{ cuda_python_version }}"
 
 # GNOME settings.
-configure_gnome_appearance: false
-configure_gnome_favorites: false
-configure_gnome_keybindings: false
+configure_gnome_appearance: true
+configure_gnome_favorites: true
+configure_gnome_keybindings: true
 enable_keypad_bindings: false
-install_google_chrome: false
+install_google_chrome: true
 
 # Shell settings.
 configure_bashrc_aliases: true

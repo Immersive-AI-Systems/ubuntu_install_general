@@ -85,18 +85,14 @@ The default install enables:
 
 - core Ubuntu packages
 - general CLI tools
-- shell aliases and Git defaults
-
-The repo also contains optional support for:
-
 - Docker
 - NVIDIA Container Toolkit
-- Anaconda
+- Anaconda with the default ML environment
 - GNOME appearance settings
-- GNOME workspace keybindings
+- GNOME favorites
+- GNOME workspace arrow bindings
 - Google Chrome
-
-Those optional pieces are off by default and can be enabled with Ansible variables.
+- shell aliases and Git defaults
 
 ## What Runs Where
 
@@ -143,44 +139,20 @@ Run the default install:
 
 `-K` tells Ansible to ask for the sudo password on the target machine.
 
-## Optional Features
+## Changing The Defaults
 
-If you want extra components beyond the default install, enable them with `-e`.
+If you want a lighter install or different behavior, override variables with `-e` or edit `group_vars/all.yml`.
 
-Enable Anaconda:
+For example, to skip Chrome:
 
 ```bash
-./run_install.sh -i inventory.ini -K -e install_anaconda=true
+./run_install.sh -i inventory.ini -K -e install_google_chrome=false
 ```
 
-Enable Docker:
+To skip Docker, NVIDIA Container Toolkit, and Anaconda:
 
 ```bash
-./run_install.sh -i inventory.ini -K -e install_docker=true
-```
-
-Enable Docker plus NVIDIA Container Toolkit:
-
-```bash
-./run_install.sh -i inventory.ini -K -e install_docker=true -e install_nvidia_container_toolkit=true
-```
-
-Enable GNOME appearance and workspace arrow bindings:
-
-```bash
-./run_install.sh -i inventory.ini -K -e configure_gnome_appearance=true -e configure_gnome_favorites=true -e configure_gnome_keybindings=true
-```
-
-Enable keypad workspace bindings too:
-
-```bash
-./run_install.sh -i inventory.ini -K -e configure_gnome_appearance=true -e configure_gnome_favorites=true -e configure_gnome_keybindings=true -e enable_keypad_bindings=true
-```
-
-Enable Google Chrome:
-
-```bash
-./run_install.sh -i inventory.ini -K -e install_google_chrome=true
+./run_install.sh -i inventory.ini -K -e install_docker=false -e install_nvidia_container_toolkit=false -e install_anaconda=false
 ```
 
 ## Important Files
