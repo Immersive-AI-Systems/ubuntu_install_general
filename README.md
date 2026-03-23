@@ -2,7 +2,7 @@
 
 Ansible playbooks for setting up an Ubuntu machine with a few simple install profiles.
 
-This is meant to be used from your local controller machine against one or more Ubuntu targets over SSH.
+This repo is meant to be run from your local computer against one or more remote Ubuntu machines over SSH.
 
 ## What You Get
 
@@ -12,9 +12,32 @@ This is meant to be used from your local controller machine against one or more 
 - optional GNOME appearance and workspace keybinding setup
 - useful `.bashrc` aliases and Git defaults
 
+## How This Is Used
+
+There are two machines involved:
+
+- `controller machine`: your local computer, for example your Mac or laptop, where this repo is cloned and where you run the Ansible commands
+- `target machine`: the remote Ubuntu machine that will be configured by these playbooks
+
+You run everything in this repo on the controller machine. Ansible then connects from the controller machine to the target machine over SSH and applies the setup there.
+
 ## Before You Start
 
-You should already be able to SSH into the target machine.
+Before using these playbooks, plain SSH access from the controller machine to the target machine should already work.
+
+In practice, this means a command like this should succeed from your local machine:
+
+```bash
+ssh myuser@192.168.1.10
+```
+
+If the target uses a non-default SSH port, this should work:
+
+```bash
+ssh -p 2222 myuser@192.168.1.10
+```
+
+If SSH does not work yet, fix that first. This repo assumes the network path, username, SSH key or password, and host reachability are already in place.
 
 Install the required Ansible collection:
 
@@ -34,6 +57,8 @@ Then edit `inventory.ini` so it points at your machine. A typical entry looks li
 [ubuntu]
 my-machine ansible_host=192.168.1.10 ansible_user=myuser ansible_port=22
 ```
+
+Those inventory values should match the same connection details you would use manually with SSH.
 
 ## Quick Start
 
