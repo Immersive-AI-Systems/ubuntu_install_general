@@ -1,48 +1,43 @@
 # ubuntu_install_general
 
-Small Ansible-based Ubuntu setup for colleagues and shared machines.
+Ansible playbooks for setting up an Ubuntu machine with a few simple install profiles.
 
-This repo is intentionally generic:
+This is meant to be used from your local controller machine against one or more Ubuntu targets over SSH.
 
-- no shared `/etc/hosts` management
-- no lab hostnames or usernames
-- no private repo cloning
-- no machine self-update logic
-- optional GNOME keypad bindings, disabled by default
+## What You Get
 
-## What it covers
+- core Ubuntu packages and CLI tools
+- optional Docker and NVIDIA Container Toolkit setup
+- optional Anaconda-based Python environment
+- optional GNOME appearance and workspace keybinding setup
+- useful `.bashrc` aliases and Git defaults
 
-- base Ubuntu packages and CLI tools
-- optional Docker and NVIDIA Container Toolkit
-- optional Anaconda environment setup
-- optional GNOME appearance and keybindings
-- lightweight `.bashrc` helpers
+## Before You Start
 
-## Setup
+You should already be able to SSH into the target machine.
 
-Install Ansible and the required collection:
+Install the required Ansible collection:
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Create an inventory from the example:
+Create your inventory file:
 
 ```bash
 cp inventory/example.ini inventory.ini
 ```
 
-Edit `inventory.ini` so it points at your target host.
+Then edit `inventory.ini` so it points at your machine. A typical entry looks like this:
 
-## Profiles
+```ini
+[ubuntu]
+my-machine ansible_host=192.168.1.10 ansible_user=myuser ansible_port=22
+```
 
-Three simple profiles are included:
+## Quick Start
 
-- `minimal`: base packages and shell helpers only
-- `desktop`: GNOME appearance, favorites, and arrow-based workspace switching
-- `ml`: Docker, NVIDIA container toolkit, and an Anaconda ML environment
-
-Run them like this:
+Choose one of the included profiles and run it:
 
 ```bash
 ./run_profile.sh minimal -i inventory.ini -K
@@ -56,39 +51,68 @@ Run them like this:
 ./run_profile.sh ml -i inventory.ini -K
 ```
 
-You can also combine profiles directly with `ansible-playbook`:
+`-K` asks Ansible for the sudo password on the target machine.
+
+## Profiles
+
+### `minimal`
+
+Installs the general Ubuntu packages, CLI tools, and shell helpers.
+
+### `desktop`
+
+Adds GNOME appearance settings, favorites, and arrow-based workspace switching.
+
+### `ml`
+
+Adds Docker, NVIDIA Container Toolkit, Anaconda, and a ready-made ML Python environment.
+
+## Running Without The Wrapper
+
+If you want direct control over Ansible arguments, run the site playbook yourself:
+
+```bash
+ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/minimal.yml -K
+```
+
+You can also combine profiles:
 
 ```bash
 ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/desktop.yml -e @group_vars/profiles/ml.yml -K
 ```
 
-## Customization
+## Common Overrides
 
-The defaults live in `group_vars/all.yml`.
+The shared defaults live in `group_vars/all.yml`. A few useful overrides:
 
-Typical overrides:
-
-- disable keypad bindings entirely: already the default
-- enable keypad bindings:
+Enable keypad workspace bindings:
 
 ```bash
 ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/desktop.yml -e enable_keypad_bindings=true -K
 ```
 
-- install Chrome alongside the desktop profile:
+Install Google Chrome with the desktop profile:
 
 ```bash
 ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/desktop.yml -e install_google_chrome=true -K
 ```
 
-- auto-activate the ML conda environment on login:
+Auto-activate the ML conda environment on login:
 
 ```bash
 ansible-playbook -i inventory.ini site.yml -e @group_vars/profiles/ml.yml -e conda_auto_activate_env=ml -K
 ```
 
+## Files
+
+- `site.yml`: main playbook entrypoint
+- `run_profile.sh`: convenience wrapper for running named profiles
+- `group_vars/all.yml`: shared defaults
+- `group_vars/profiles/`: profile-specific settings
+- `playbooks/`: the individual setup playbooks
+
 ## Notes
 
-- The playbooks target the inventory group `ubuntu` by default.
-- Override the target group or host with `-e host_target=<name>` if needed.
-- The GNOME tasks require the `community.general` collection.
+- The default Ansible target group is `ubuntu`.
+- You can override the target with `-e host_target=<group-or-host>`.
+- The GNOME tasks depend on the `community.general` collection from `requirements.yml`.
